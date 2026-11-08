@@ -108,13 +108,11 @@ SHORT_DESCRIPTION = "Koreya vizasi holatini tekshirish — Turan Int. School"
 # --------------------------------------------------------------------------- #
 
 def webapp_keyboard() -> dict[str, Any]:
-    row2 = [{"text": "🌐 Brauzerda ochish", "url": WEBAPP_URL}]
+    # Sayt manzili ko'rsatilmaydi: faqat Telegram ichida ochiladigan Web App tugmasi
+    rows: list[list[dict[str, Any]]] = [[{"text": "🔎 Viza holatini tekshirish", "web_app": {"url": WEBAPP_URL}}]]
     if CHANNEL_URL:
-        row2.append({"text": "📢 Kanalimiz", "url": CHANNEL_URL})
-    return {"inline_keyboard": [
-        [{"text": "🔎 Viza holatini tekshirish", "web_app": {"url": WEBAPP_URL}}],
-        row2,
-    ]}
+        rows.append([{"text": "📢 Kanalimiz", "url": CHANNEL_URL}])
+    return {"inline_keyboard": rows}
 
 
 def subscribe_keyboard() -> dict[str, Any]:
