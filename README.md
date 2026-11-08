@@ -15,6 +15,12 @@ Telegram bot: `/start` bosilganda sayt haqida aytib beradi. Foydalanuvchi **kana
 
 Bot buyruqlar ro'yxati va tavsifini ishga tushganda o'zi sozlaydi. Guruhlarda javob bermaydi, faqat shaxsiy chatda ishlaydi.
 
+## Natijani chatga yuborish
+
+Bot Web App tugmasi va menyusidagi URL'ga har bir foydalanuvchi uchun **imzolangan chat ID** (`?cid=...&sig=...`) qo'shadi. Imzo HMAC-SHA256 bilan olinadi, uning kaliti `BOT_TOKEN` dan hosil qilinadi. Sayt imzoni tekshiradi va tekshiruv natijasini shu chatga yuboradi. Soxta yoki boshqa chat ID bilan hech narsa yuborilmaydi.
+
+Ishlashi uchun saytning (`korea-visa`) Railway sozlamalarida `TELEGRAM_BOT_TOKEN` shu bot tokeni bilan **bir xil** bo'lishi kerak.
+
 ## Kanalga obuna majburiyati
 
 - Obuna har safar `getChatMember` orqali tekshiriladi. Foydalanuvchi kanaldan chiqib ketsa, keyingi `/start` da Web App tugmasi va menyu yana yopiladi.

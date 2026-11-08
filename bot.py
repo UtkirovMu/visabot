@@ -8,6 +8,9 @@ Ishga tushirish:  BOT_TOKEN=... python bot.py
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import html
 import json
 import logging
@@ -16,6 +19,7 @@ import signal
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any
 
@@ -32,6 +36,18 @@ CHANNEL_URL = os.environ.get("CHANNEL_URL", "").strip() or (
 API_BASE = os.environ.get("TELEGRAM_API_BASE", "https://api.telegram.org").rstrip("/")  # faqat test uchun o'zgaradi
 POLL_TIMEOUT = 50  # soniya (long polling)
 CHECK_SUB = "check_sub"  # "Obuna bo'ldim" tugmasi callback'i
+
+
+def webapp_url_for(chat_id: int) -> str:
+    """Web App manzili + imzolangan chat ID. Sayt imzoni tekshirib, natijani shu chatga yuboradi.
+
+    imzo = base64url(HMAC_SHA256(key, chat_id)), key = HMAC_SHA256("turan-visa-link", BOT_TOKEN).
+    Imzosiz yoki boshqa chat ID bilan sayt hech narsa yubormaydi.
+    """
+    key = hmac.new(b"turan-visa-link", BOT_TOKEN.encode(), hashlib.sha256).digest()
+    sig = base64.urlsafe_b64encode(hmac.new(key, str(chat_id).encode(), hashlib.sha256).digest()).rstrip(b"=").decode()
+    sep = "&" if "?" in WEBAPP_URL else "?"
+    return f"{WEBAPP_URL}{sep}{urllib.parse.urlencode({'cid': chat_id, 'sig': sig})}"
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
@@ -107,9 +123,9 @@ SHORT_DESCRIPTION = "Koreya vizasi holatini tekshirish — Turan Int. School"
 #  Tugmalar
 # --------------------------------------------------------------------------- #
 
-def webapp_keyboard() -> dict[str, Any]:
+def webapp_keyboard(chat_id: int) -> dict[str, Any]:
     # Sayt manzili ko'rsatilmaydi: faqat Telegram ichida ochiladigan Web App tugmasi
-    rows: list[list[dict[str, Any]]] = [[{"text": "🔎 Viza holatini tekshirish", "web_app": {"url": WEBAPP_URL}}]]
+    rows: list[list[dict[str, Any]]] = [[{"text": "🔎 Viza holatini tekshirish", "web_app": {"url": webapp_url_for(chat_id)}}]]
     if CHANNEL_URL:
         rows.append([{"text": "📢 Kanalimiz", "url": CHANNEL_URL}])
     return {"inline_keyboard": rows}
@@ -209,7 +225,7 @@ def is_subscribed(user_id: int) -> bool | None:
 def set_user_menu(chat_id: int, subscribed: bool) -> None:
     """Pastdagi menyu tugmasi: obunachiga — Web App, boshqalarga — oddiy buyruqlar menyusi."""
     menu = (
-        {"type": "web_app", "text": "Tekshirish", "web_app": {"url": WEBAPP_URL}}
+        {"type": "web_app", "text": "Tekshirish", "web_app": {"url": webapp_url_for(chat_id)}}
         if subscribed else {"type": "commands"}
     )
     safe_api("setChatMenuButton", {"chat_id": chat_id, "menu_button": menu})
@@ -227,7 +243,7 @@ def gate(chat_id: int, user_id: int, first_name: str, granted_text: str) -> None
         return
     set_user_menu(chat_id, sub)
     if sub:
-        send(chat_id, granted_text, webapp_keyboard())
+        send(chat_id, granted_text, webapp_keyboard(chat_id))
     else:
         send(chat_id, subscribe_text(first_name), subscribe_keyboard())
 
@@ -283,10 +299,10 @@ def handle_callback(cq: dict[str, Any]) -> None:
         "text": SUBSCRIBED_TEXT,
         "parse_mode": "HTML",
         "link_preview_options": {"is_disabled": True},
-        "reply_markup": webapp_keyboard(),
+        "reply_markup": webapp_keyboard(chat_id),
     })
     if edited is None:  # xabar juda eski bo'lsa tahrirlab bo'lmaydi — yangisini yuboramiz
-        send(chat_id, SUBSCRIBED_TEXT, webapp_keyboard())
+        send(chat_id, SUBSCRIBED_TEXT, webapp_keyboard(chat_id))
 
 
 def handle_update(update: dict[str, Any]) -> None:
