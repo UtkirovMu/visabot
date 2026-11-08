@@ -28,6 +28,8 @@ Bot buyruqlar ro'yxati va tavsifini ishga tushganda o'zi sozlaydi. Guruhlarda ja
 3. Botni kanalga **administrator** qilib qo'shing.
 4. Deploy qiling. Loglarda `Bot ishga tushdi: @...` yozuvi chiqishi kerak.
 
+Build Dockerfile orqali bo'ladi (`railway.json`), shuning uchun Railpack kerak emas.
+
 Bot long polling bilan ishlaydi, shuning uchun port yoki domen kerak emas. Bir vaqtda faqat **bitta** nusxa ishlashi kerak. Aks holda loglarda "getUpdates conflict" xatosi chiqadi.
 
 ### Ixtiyoriy o'zgaruvchilar
