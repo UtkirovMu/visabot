@@ -248,6 +248,31 @@ def gate(chat_id: int, user_id: int, first_name: str, granted_text: str) -> None
         send(chat_id, subscribe_text(first_name), subscribe_keyboard())
 
 
+def custom_emoji_reply(msg: dict[str, Any]) -> str | None:
+    """Xabarda premium (custom) emoji bo'lsa — ularning ID'larini qaytaradi (saytdagi TELEGRAM_CUSTOM_EMOJI uchun)."""
+    text = msg.get("text") if isinstance(msg.get("text"), str) else ""
+    ents = [e for e in (msg.get("entities") or []) if isinstance(e, dict) and e.get("type") == "custom_emoji"]
+    if not ents:
+        return None
+    utf16 = text.encode("utf-16-le")
+    lines, seen = [], set()
+    for e in ents[:30]:
+        eid = str(e.get("custom_emoji_id", ""))
+        if not eid.isdigit() or eid in seen:
+            continue
+        seen.add(eid)
+        off, ln = int(e.get("offset", 0)), int(e.get("length", 0))
+        ch = utf16[off * 2:(off + ln) * 2].decode("utf-16-le", errors="ignore")
+        lines.append(f'{html.escape(ch) or "⭐"}  <code>{eid}</code>')
+    if not lines:
+        return None
+    return (
+        "🆔 <b>Premium emoji ID'lari:</b>\n\n" + "\n".join(lines) + "\n\n"
+        "Saytdagi <code>TELEGRAM_CUSTOM_EMOJI</code> o'zgaruvchisiga shunday yozing:\n"
+        "<code>bell=ID,user=ID,status=ID,date=ID,type=ID,embassy=ID,time=ID,warn=ID,notfound=ID</code>"
+    )
+
+
 def handle_message(msg: dict[str, Any]) -> None:
     chat = msg.get("chat") or {}
     if chat.get("type") != "private":  # faqat shaxsiy chatlarda javob beradi
@@ -261,6 +286,11 @@ def handle_message(msg: dict[str, Any]) -> None:
     text = msg.get("text") if isinstance(msg.get("text"), str) else ""
     command = text.split()[0].split("@")[0].lower() if text.startswith("/") else ""
     first_name = str(user.get("first_name") or "")
+
+    emoji_ids = custom_emoji_reply(msg)
+    if emoji_ids:
+        send(chat_id, emoji_ids, None)
+        return
 
     if command == "/start":
         gate(chat_id, user_id, first_name, start_text(first_name))

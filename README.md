@@ -21,6 +21,10 @@ Bot Web App tugmasi va menyusidagi URL'ga har bir foydalanuvchi uchun **imzolang
 
 Ishlashi uchun saytning (`korea-visa`) Railway sozlamalarida `TELEGRAM_BOT_TOKEN` shu bot tokeni bilan **bir xil** bo'lishi kerak.
 
+## Premium emoji ID'larini bilish
+
+Botga premium (custom) emoji yuborsangiz, u har birining ID'sini qaytaradi. Bu ID'larni saytdagi `TELEGRAM_CUSTOM_EMOJI` o'zgaruvchisiga yozasiz (batafsil `korea-visa` README'sida).
+
 ## Kanalga obuna majburiyati
 
 - Obuna har safar `getChatMember` orqali tekshiriladi. Foydalanuvchi kanaldan chiqib ketsa, keyingi `/start` da Web App tugmasi va menyu yana yopiladi.
