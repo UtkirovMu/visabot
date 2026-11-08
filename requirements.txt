@@ -1,0 +1,1 @@
+# Tashqi paketlar kerak emas — bot faqat Python standart kutubxonasidan foydalanadi.
