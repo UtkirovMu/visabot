@@ -21,9 +21,25 @@ Bot Web App tugmasi va menyusidagi URL'ga har bir foydalanuvchi uchun **imzolang
 
 Ishlashi uchun saytning (`korea-visa`) Railway sozlamalarida `TELEGRAM_BOT_TOKEN` shu bot tokeni bilan **bir xil** bo'lishi kerak.
 
-## Premium emoji ID'larini bilish
+## Premium emoji
 
-Botga premium (custom) emoji yuborsangiz, u har birining ID'sini qaytaradi. Bu ID'larni saytdagi `TELEGRAM_CUSTOM_EMOJI` o'zgaruvchisiga yozasiz (batafsil `korea-visa` README'sida).
+Botga premium (custom) emoji yuborsangiz, u har birining ID'sini qaytaradi. Shart: bot egasida Telegram Premium bo'lishi kerak (Bot API 9.4+).
+
+- **Natija xabari** (uni sayt yuboradi): sayt servisida `TELEGRAM_CUSTOM_EMOJI` (batafsil `korea-visa` README'sida).
+- **Bot xabarlari va tugmalari:** bot servisida `BOT_CUSTOM_EMOJI`, masalan `flag=5406701447217713631,point=5463123191339715467`
+
+| Kalit | Oddiy emoji | Qayerda |
+|---|---|---|
+| `wave` | 👋 | "Assalomu alaykum" |
+| `flag` | 🇰🇷 | "Bu yerda Koreya vizasi…" |
+| `point` | 👇 | "Tekshirish uchun quyidagi tugmani bosing" |
+| `channel` | 📢 | Kanalga obuna matni va tugmalari |
+| `ok` | ✅ | "Obuna tasdiqlandi" va "Obuna bo'ldim" tugmasi |
+| `info` | ℹ️ | /help sarlavhasi |
+| `warn` | ⚠️ | "Obunani tekshirib bo'lmadi" |
+| `search` | 🔎 | "Viza holatini tekshirish" tugmasi |
+
+Tugmalarda premium emoji tugma ikonkasi (`icon_custom_emoji_id`) sifatida chiqadi. Telegram premiumni rad etsa, xabar oddiy emojilar bilan qayta yuboriladi.
 
 ## Kanalga obuna majburiyati
 

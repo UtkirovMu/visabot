@@ -15,13 +15,14 @@ import html
 import json
 import logging
 import os
+import re
 import signal
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any
+from typing import Any, Callable
 
 # --------------------------------------------------------------------------- #
 #  Sozlamalar (faqat muhit o'zgaruvchilaridan — token kodda saqlanmaydi)
@@ -57,59 +58,115 @@ log = logging.getLogger("visabot")
 
 
 # --------------------------------------------------------------------------- #
-#  Matnlar
+#  Premium (custom) emoji
+# --------------------------------------------------------------------------- #
+# Bot API 9.4+: bot egasida Telegram Premium bo'lsa, bot xabarlari va tugmalarida custom emoji ishlatish mumkin.
+# Sozlash: BOT_CUSTOM_EMOJI="flag=5406701447217713631,point=5463123191339715467,..."
+# Berilmagan kalitlar uchun oddiy emoji. Telegram rad etsa — xabar oddiy emoji bilan qayta yuboriladi.
+
+EMOJI = {
+    "wave": "👋",     # salomlashish
+    "flag": "🇰🇷",    # Koreya vizasi
+    "point": "👇",    # "quyidagi tugmani bosing"
+    "channel": "📢",  # kanalga obuna (matn va tugma)
+    "ok": "✅",       # obuna tasdiqlandi (matn va tugma)
+    "info": "ℹ️",     # /help sarlavhasi
+    "warn": "⚠️",     # obunani tekshirib bo'lmadi
+    "search": "🔎",   # "Viza holatini tekshirish" tugmasi
+}
+
+
+def _parse_custom_emoji(raw: str) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for part in raw.split(","):
+        k, _, v = part.strip().partition("=")
+        k, v = k.strip(), v.strip()
+        if k in EMOJI and v.isdigit() and 5 <= len(v) <= 25:
+            out[k] = v
+    return out
+
+
+CUSTOM_IDS = _parse_custom_emoji(os.environ.get("BOT_CUSTOM_EMOJI", ""))
+_TOKEN_RE = re.compile(r"⟦(\w+)⟧")
+
+
+def render(template: str, premium: bool) -> str:
+    """⟦kalit⟧ belgilarini premium (<tg-emoji>) yoki oddiy emojiga almashtiradi."""
+    def rep(m: re.Match[str]) -> str:
+        key = m.group(1)
+        fallback = EMOJI.get(key, "")
+        eid = CUSTOM_IDS.get(key) if premium else None
+        return f'<tg-emoji emoji-id="{eid}">{fallback}</tg-emoji>' if eid else fallback
+    return _TOKEN_RE.sub(rep, template)
+
+
+def button(key: str, label: str, premium: bool, **action: Any) -> dict[str, Any]:
+    """Tugma: premium bo'lsa emoji tugma ikonkasi (icon_custom_emoji_id), aks holda matn boshida oddiy emoji."""
+    eid = CUSTOM_IDS.get(key) if premium else None
+    if eid:
+        return {"text": label, "icon_custom_emoji_id": eid, **action}
+    return {"text": f"{EMOJI[key]} {label}", **action}
+
+
+# --------------------------------------------------------------------------- #
+#  Matnlar  (⟦kalit⟧ — emoji o'rni)
 # --------------------------------------------------------------------------- #
 
 def _name(first_name: str) -> str:
-    return html.escape(first_name.strip()[:64]) or "do'st"
+    clean = first_name.replace("⟦", "").replace("⟧", "").strip()[:64]
+    return html.escape(clean) or "do'st"
+
+
+INTRO = (
+    "Bu bot <b>Turan Int. School</b> tomonidan talabalar uchun qulaylik yaratish "
+    "maqsadida ishlab chiqilgan.\n\n"
+    "⟦flag⟧ Bu yerda <b>Koreya vizasi</b> arizangiz holatini tekshirishingiz mumkin."
+)
 
 
 def start_text(first_name: str) -> str:
     return (
-        f"Assalomu alaykum, <b>{_name(first_name)}</b>! 👋\n\n"
-        "Bu bot <b>Turan Int. School</b> tomonidan talabalar uchun qulaylik yaratish "
-        "maqsadida ishlab chiqilgan.\n\n"
-        "🇰🇷 Bu yerda <b>Koreya vizasi</b> arizangiz holatini tekshirishingiz mumkin.\n\n"
+        f"Assalomu alaykum, <b>{_name(first_name)}</b>! ⟦wave⟧\n\n"
+        f"{INTRO}\n\n"
         "<b>Kerakli ma'lumotlar:</b>\n"
         "• Pasport raqami\n"
         "• Familiya, ism, otasining ismi (pasportdagidek, lotin harflarida)\n"
         "• Tug'ilgan sana\n\n"
-        "👇 Tekshirish uchun quyidagi tugmani bosing."
+        "⟦point⟧ Tekshirish uchun quyidagi tugmani bosing."
     )
 
 
 def subscribe_text(first_name: str) -> str:
     return (
-        f"Assalomu alaykum, <b>{_name(first_name)}</b>! 👋\n\n"
-        "Bu bot <b>Turan Int. School</b> tomonidan talabalar uchun qulaylik yaratish "
-        "maqsadida ishlab chiqilgan. Bu yerda <b>Koreya vizasi</b> arizangiz holatini "
-        "tekshirishingiz mumkin.\n\n"
-        "📢 Botdan foydalanish uchun avval <b>kanalimizga obuna bo'ling</b>, so'ng "
-        "«✅ Obuna bo'ldim» tugmasini bosing."
+        f"Assalomu alaykum, <b>{_name(first_name)}</b>! ⟦wave⟧\n\n"
+        f"{INTRO}\n\n"
+        "⟦channel⟧ Botdan foydalanish uchun avval <b>kanalimizga obuna bo'ling</b>, so'ng "
+        "«Obuna bo'ldim» tugmasini bosing."
     )
 
 
 SUBSCRIBED_TEXT = (
-    "✅ <b>Rahmat, obuna tasdiqlandi!</b>\n\n"
+    "⟦ok⟧ <b>Rahmat, obuna tasdiqlandi!</b>\n\n"
     "Endi viza holatingizni tekshirishingiz mumkin. Pasport raqami, F.I.Sh "
     "(pasportdagidek, lotin harflarida) va tug'ilgan sanangizni tayyorlab qo'ying.\n\n"
-    "👇 Quyidagi tugmani bosing."
+    "⟦point⟧ Quyidagi tugmani bosing."
 )
 
 NOT_SUBSCRIBED_ALERT = "Siz hali kanalga obuna bo'lmagansiz. Avval obuna bo'ling, so'ng qayta bosing."
-CHECK_FAILED_TEXT = "⚠️ Obunani tekshirib bo'lmadi. Birozdan so'ng qaytadan urinib ko'ring."
+CHECK_FAILED_TEXT = "⟦warn⟧ Obunani tekshirib bo'lmadi. Birozdan so'ng qaytadan urinib ko'ring."
+CHECK_FAILED_ALERT = "Obunani tekshirib bo'lmadi. Birozdan so'ng qaytadan urinib ko'ring."
 
 HELP_TEXT = (
-    "ℹ️ <b>Qanday foydalaniladi?</b>\n\n"
+    "⟦info⟧ <b>Qanday foydalaniladi?</b>\n\n"
     "1. Kanalimizga obuna bo'ling.\n"
-    "2. «🔎 Viza holatini tekshirish» tugmasini bosing.\n"
+    "2. «Viza holatini tekshirish» tugmasini bosing.\n"
     "3. Pasport ma'lumotlaringizni pasportdagidek lotin harflarida kiriting.\n"
     "4. «Tekshirish» tugmasini bosing — natija bir necha soniyada chiqadi.\n\n"
     "<i>Ma'lumotlaringiz saqlanmaydi — faqat tekshiruv uchun ishlatiladi.\n"
     "Ma'lumotlar rasmiy visa.go.kr saytidan olinadi.</i>"
 )
 
-FALLBACK_TEXT = "Viza holatini tekshirish uchun quyidagi tugmani bosing 👇"
+FALLBACK_TEXT = "Viza holatini tekshirish uchun quyidagi tugmani bosing ⟦point⟧"
 
 DESCRIPTION = (
     "Turan Int. School — Koreya vizasi arizangiz holatini tekshirish boti.\n\n"
@@ -123,19 +180,21 @@ SHORT_DESCRIPTION = "Koreya vizasi holatini tekshirish — Turan Int. School"
 #  Tugmalar
 # --------------------------------------------------------------------------- #
 
-def webapp_keyboard(chat_id: int) -> dict[str, Any]:
+def webapp_keyboard(chat_id: int, premium: bool = True) -> dict[str, Any]:
     # Sayt manzili ko'rsatilmaydi: faqat Telegram ichida ochiladigan Web App tugmasi
-    rows: list[list[dict[str, Any]]] = [[{"text": "🔎 Viza holatini tekshirish", "web_app": {"url": webapp_url_for(chat_id)}}]]
+    rows: list[list[dict[str, Any]]] = [[
+        button("search", "Viza holatini tekshirish", premium, web_app={"url": webapp_url_for(chat_id)}),
+    ]]
     if CHANNEL_URL:
-        rows.append([{"text": "📢 Kanalimiz", "url": CHANNEL_URL}])
+        rows.append([button("channel", "Kanalimiz", premium, url=CHANNEL_URL)])
     return {"inline_keyboard": rows}
 
 
-def subscribe_keyboard() -> dict[str, Any]:
+def subscribe_keyboard(premium: bool = True) -> dict[str, Any]:
     rows: list[list[dict[str, Any]]] = []
     if CHANNEL_URL:
-        rows.append([{"text": "📢 Kanalga obuna bo'lish", "url": CHANNEL_URL}])
-    rows.append([{"text": "✅ Obuna bo'ldim", "callback_data": CHECK_SUB}])
+        rows.append([button("channel", "Kanalga obuna bo'lish", premium, url=CHANNEL_URL)])
+    rows.append([button("ok", "Obuna bo'ldim", premium, callback_data=CHECK_SUB)])
     return {"inline_keyboard": rows}
 
 
@@ -186,16 +245,38 @@ def safe_api(method: str, payload: dict[str, Any]) -> Any:
         return None
 
 
-def send(chat_id: int, text: str, keyboard: dict[str, Any] | None) -> None:
-    payload: dict[str, Any] = {
-        "chat_id": chat_id,
-        "text": text,
-        "parse_mode": "HTML",
-        "link_preview_options": {"is_disabled": True},
-    }
-    if keyboard:
-        payload["reply_markup"] = keyboard
-    safe_api("sendMessage", payload)
+Keyboard = Callable[[bool], "dict[str, Any] | None"]
+
+
+def _rich(method: str, base: dict[str, Any], template: str, keyboard: Keyboard | None) -> Any:
+    """Xabar yuborish/tahrirlash: avval premium emoji bilan, Telegram rad etsa — oddiy emoji bilan."""
+    def payload(premium: bool) -> dict[str, Any]:
+        p = {**base, "text": render(template, premium), "parse_mode": "HTML", "link_preview_options": {"is_disabled": True}}
+        kb = keyboard(premium) if keyboard else None
+        if kb:
+            p["reply_markup"] = kb
+        return p
+
+    premium = bool(CUSTOM_IDS)
+    try:
+        return api(method, payload(premium))
+    except TelegramError as e:
+        if e.retry_after:
+            time.sleep(min(int(e.retry_after), 30))
+            return safe_api(method, payload(premium))
+        if premium and str(e).startswith("Bad Request") and "message is not modified" not in str(e):
+            log.warning("Premium emoji rad etildi, oddiy emoji bilan yuborilmoqda: %s", e)
+            return safe_api(method, payload(False))
+        log.warning("%s xatosi: %s", method, e)  # masalan, foydalanuvchi botni bloklagan
+        return None
+
+
+def send(chat_id: int, text: str, keyboard: Keyboard | None) -> Any:
+    return _rich("sendMessage", {"chat_id": chat_id}, text, keyboard)
+
+
+def edit(chat_id: int, message_id: Any, text: str, keyboard: Keyboard | None) -> Any:
+    return _rich("editMessageText", {"chat_id": chat_id, "message_id": message_id}, text, keyboard)
 
 
 # --------------------------------------------------------------------------- #
@@ -243,9 +324,9 @@ def gate(chat_id: int, user_id: int, first_name: str, granted_text: str) -> None
         return
     set_user_menu(chat_id, sub)
     if sub:
-        send(chat_id, granted_text, webapp_keyboard(chat_id))
+        send(chat_id, granted_text, lambda pr: webapp_keyboard(chat_id, pr))
     else:
-        send(chat_id, subscribe_text(first_name), subscribe_keyboard())
+        send(chat_id, subscribe_text(first_name), subscribe_keyboard)
 
 
 def custom_emoji_reply(msg: dict[str, Any]) -> str | None:
@@ -268,8 +349,10 @@ def custom_emoji_reply(msg: dict[str, Any]) -> str | None:
         return None
     return (
         "🆔 <b>Premium emoji ID'lari:</b>\n\n" + "\n".join(lines) + "\n\n"
-        "Saytdagi <code>TELEGRAM_CUSTOM_EMOJI</code> o'zgaruvchisiga shunday yozing:\n"
-        "<code>bell=ID,user=ID,status=ID,date=ID,type=ID,embassy=ID,time=ID,warn=ID,notfound=ID</code>"
+        "<b>Sayt</b> (natija xabari) — <code>TELEGRAM_CUSTOM_EMOJI</code>:\n"
+        "<code>bell=ID,user=ID,status=ID,date=ID,type=ID,embassy=ID,time=ID,warn=ID,notfound=ID</code>\n\n"
+        "<b>Bot</b> (/start va tugmalar) — <code>BOT_CUSTOM_EMOJI</code>:\n"
+        "<code>wave=ID,flag=ID,point=ID,channel=ID,ok=ID,info=ID,warn=ID,search=ID</code>"
     )
 
 
@@ -314,7 +397,7 @@ def handle_callback(cq: dict[str, Any]) -> None:
 
     sub = is_subscribed(user_id)
     if sub is None:
-        safe_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": CHECK_FAILED_TEXT, "show_alert": True})
+        safe_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": CHECK_FAILED_ALERT, "show_alert": True})
         return
     if not sub:
         safe_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": NOT_SUBSCRIBED_ALERT, "show_alert": True})
@@ -323,16 +406,9 @@ def handle_callback(cq: dict[str, Any]) -> None:
     safe_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": "✅ Obuna tasdiqlandi"})
     chat_id = chat.get("id")
     set_user_menu(chat_id, True)
-    edited = safe_api("editMessageText", {
-        "chat_id": chat_id,
-        "message_id": msg.get("message_id"),
-        "text": SUBSCRIBED_TEXT,
-        "parse_mode": "HTML",
-        "link_preview_options": {"is_disabled": True},
-        "reply_markup": webapp_keyboard(chat_id),
-    })
-    if edited is None:  # xabar juda eski bo'lsa tahrirlab bo'lmaydi — yangisini yuboramiz
-        send(chat_id, SUBSCRIBED_TEXT, webapp_keyboard(chat_id))
+    kb = lambda pr: webapp_keyboard(chat_id, pr)  # noqa: E731
+    if edit(chat_id, msg.get("message_id"), SUBSCRIBED_TEXT, kb) is None:
+        send(chat_id, SUBSCRIBED_TEXT, kb)  # xabar juda eski bo'lsa tahrirlab bo'lmaydi — yangisini yuboramiz
 
 
 def handle_update(update: dict[str, Any]) -> None:
