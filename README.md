@@ -15,6 +15,15 @@ Telegram bot: `/start` bosilganda sayt haqida aytib beradi. Foydalanuvchi **kana
 
 Bot buyruqlar ro'yxati va tavsifini ishga tushganda o'zi sozlaydi. Guruhlarda javob bermaydi, faqat shaxsiy chatda ishlaydi.
 
+## Admin panel
+
+`ADMIN_IDS` va `ADMIN_APP_URL` o'rnatilsa, faqat adminlarda `/admin` buyrug'i va «🛠 Admin panel» tugmasi paydo bo'ladi. Bu tugma [visa-bot-admin](https://github.com/UtkirovMu/visa-bot-admin) Web App'ini ochadi. Boshqa foydalanuvchilar uchun hech narsa o'zgarmaydi.
+
+| Nomi | Qiymati |
+|---|---|
+| `ADMIN_IDS` | `1830068413` (bir nechta bo'lsa, vergul bilan) |
+| `ADMIN_APP_URL` | visa-bot-admin servisining domeni (`https://...`) |
+
 ## Natijani chatga yuborish
 
 Bot Web App tugmasi va menyusidagi URL'ga har bir foydalanuvchi uchun **imzolangan chat ID** (`?cid=...&sig=...`) qo'shadi. Imzo HMAC-SHA256 bilan olinadi, uning kaliti `BOT_TOKEN` dan hosil qilinadi. Sayt imzoni tekshiradi va tekshiruv natijasini shu chatga yuboradi. Soxta yoki boshqa chat ID bilan hech narsa yuborilmaydi.

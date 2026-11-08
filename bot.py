@@ -34,6 +34,9 @@ CHANNEL_ID = os.environ.get("CHANNEL_ID", "@turanschoolnews").strip()  # @userna
 CHANNEL_URL = os.environ.get("CHANNEL_URL", "").strip() or (
     f"https://t.me/{CHANNEL_ID.lstrip('@')}" if CHANNEL_ID.startswith("@") else ""
 )
+# Admin panel (visa-bot-admin): faqat shu ID'larga ko'rinadi
+ADMIN_IDS = {int(x) for x in os.environ.get("ADMIN_IDS", "").replace(" ", "").split(",") if x.isdigit()}
+ADMIN_APP_URL = os.environ.get("ADMIN_APP_URL", "").strip().rstrip("/")
 API_BASE = os.environ.get("TELEGRAM_API_BASE", "https://api.telegram.org").rstrip("/")  # faqat test uchun o'zgaradi
 POLL_TIMEOUT = 50  # soniya (long polling)
 CHECK_SUB = "check_sub"  # "Obuna bo'ldim" tugmasi callback'i
@@ -187,7 +190,24 @@ def webapp_keyboard(chat_id: int, premium: bool = True) -> dict[str, Any]:
     ]]
     if CHANNEL_URL:
         rows.append([button("channel", "Kanalimiz", premium, url=CHANNEL_URL)])
+    if is_admin(chat_id):
+        rows.append([admin_button()])
     return {"inline_keyboard": rows}
+
+
+def is_admin(user_id: int) -> bool:
+    return bool(ADMIN_APP_URL) and user_id in ADMIN_IDS
+
+
+def admin_button() -> dict[str, Any]:
+    return {"text": "🛠 Admin panel", "web_app": {"url": ADMIN_APP_URL}}
+
+
+ADMIN_TEXT = (
+    "🛠 <b>Admin panel</b>\n\n"
+    "Odamlarni qo'shish, viza holatlarini ko'rish va hozir tekshirish shu yerda. "
+    "Viza chiqsa, sizga shu chatda xabar keladi."
+)
 
 
 def subscribe_keyboard(premium: bool = True) -> dict[str, Any]:
@@ -375,6 +395,10 @@ def handle_message(msg: dict[str, Any]) -> None:
         send(chat_id, emoji_ids, None)
         return
 
+    if command == "/admin" and is_admin(user_id):
+        send(chat_id, ADMIN_TEXT, lambda _pr: {"inline_keyboard": [[admin_button()]]})
+        return
+
     if command == "/start":
         gate(chat_id, user_id, first_name, start_text(first_name))
     elif command == "/help":
@@ -430,6 +454,17 @@ def setup_bot(bot_id: int) -> None:
         ("setMyDescription", {"description": DESCRIPTION}),
         ("setMyShortDescription", {"short_description": SHORT_DESCRIPTION}),
     ]
+    # Adminlar uchun qo'shimcha /admin buyrug'i (faqat ularning chatida ko'rinadi)
+    if ADMIN_APP_URL:
+        for admin_id in ADMIN_IDS:
+            steps.append(("setMyCommands", {
+                "scope": {"type": "chat", "chat_id": admin_id},
+                "commands": [
+                    {"command": "start", "description": "Botni ishga tushirish"},
+                    {"command": "admin", "description": "Admin panel"},
+                    {"command": "help", "description": "Qanday foydalaniladi"},
+                ],
+            }))
     for method, payload in steps:
         try:
             api(method, payload)
@@ -467,6 +502,11 @@ def run() -> None:
     if not CHANNEL_ID:
         log.error("CHANNEL_ID o'rnatilmagan (masalan: @turanschoolnews).")
         sys.exit(1)
+    if ADMIN_APP_URL and not ADMIN_APP_URL.startswith("https://"):
+        log.error("ADMIN_APP_URL https:// bilan boshlanishi shart.")
+        sys.exit(1)
+    if ADMIN_APP_URL:
+        log.info("Admin panel yoqilgan (adminlar: %d)", len(ADMIN_IDS))
     if not CHANNEL_URL:
         log.warning("CHANNEL_URL yo'q — yopiq kanal bo'lsa, taklif havolasini CHANNEL_URL ga qo'ying.")
 
